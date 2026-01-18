@@ -1,6 +1,6 @@
 import sys
 from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout
 import arcade
 
 SCREEN_WIDTH = 1000
@@ -17,6 +17,7 @@ BAD_COEFF = 0.5
 MISS_COEFF = 0
 START_GAME = False
 curr_time = 0
+curr_song = ''
 
 
 # --- Секция Arcade ---
@@ -29,7 +30,7 @@ class GameView(arcade.View):
         self.godly_buttons_list = arcade.SpriteList()
         self.score = 0
         self.setup()
-        self.notes_from_txt('99%')
+        self.notes_from_txt(curr_song)
 
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
@@ -50,20 +51,10 @@ class GameView(arcade.View):
                     self.godly_notes_list.append(self.note)
                 else:
                     sprite = 'img/Note.jpg'
-                    self.note = Note(sprite, 0.5, int(elem[1]), int(elem[2]),elem[0])
+                    self.note = Note(sprite, 0.5, int(elem[1]), int(elem[2]), elem[0])
                     self.notes_list.append(self.note)
 
     def setup(self):
-        '''self.note1 = Note('img/Note.jpg', 0.5, 4)
-        self.note1.center_x = 150
-        self.godly_note1 = Note('img/GodlyNote.jpg', 0.5, 6, type='Godly')
-        self.godly_note1.center_x = 150
-        self.godly_note2 = Note('img/DemonNote.jpg', 0.5, 8, type='Demon')
-        self.godly_note2.center_x = 150
-        self.notes_list.append(self.note1)
-        self.godly_notes_list.append(self.godly_note1)
-        self.godly_notes_list.append(self.godly_note2)'''
-
         self.button1 = Button('img/Button.png', 0.5, arcade.key.LEFT)
         self.button1.center_x = 150
         self.godly_button1 = Button('img/Button.png', 0.5, arcade.key.A, type='Godly')
@@ -96,34 +87,6 @@ class GameView(arcade.View):
         for button in self.godly_buttons_list:
             if key == button.key:
                 self.check_collisions(button, self.godly_notes_list, True)
-
-        '''if key == self.button1.key:
-            notes_hit_list = arcade.check_for_collision_with_list(self.button1, self.notes_list)
-            godly_notes_hit_list = arcade.check_for_collision_with_list(self.godly_button1, self.godly_notes_list)
-            if notes_hit_list:
-                if abs(notes_hit_list[0].center_y - self.button1.center_y) <= 10:
-                    print('PERFECT')
-                elif abs(notes_hit_list[0].center_y - self.button1.center_y) <= 20:
-                    print('GOOD')
-                elif abs(notes_hit_list[0].center_y - self.button1.center_y) <= 50:
-                    print('BAD')
-                elif abs(notes_hit_list[0].center_y - self.button1.center_y) > 50:
-                    print('MISS')
-                notes_hit_list[0].remove_from_sprite_lists()
-            if godly_notes_hit_list:
-                if abs(godly_notes_hit_list[0].center_y - self.godly_button1.center_y) <= 10:
-                    print('PERFECT')
-                elif abs(godly_notes_hit_list[0].center_y - self.godly_button1.center_y) <= 20:
-                    print('GOOD')
-                elif abs(godly_notes_hit_list[0].center_y - self.godly_button1.center_y) <= 50:
-                    print('BAD')
-                elif abs(godly_notes_hit_list[0].center_y - self.godly_button1.center_y) > 50:
-                    print('MISS')
-                if godly_notes_hit_list[0].type.lower() == 'demon':
-                    self.normal_note = Note('img/Note.jpg', 0.5, godly_notes_hit_list[0].time_to_button + 1)
-                    self.normal_note.center_x = 150
-                    self.notes_list.append(self.normal_note)
-                godly_notes_hit_list[0].remove_from_sprite_lists()'''
 
     def check_collisions(self, button, notes_list, is_godly):
         notes_hit_list = arcade.check_for_collision_with_list(button, notes_list)
@@ -205,28 +168,55 @@ class Button(arcade.Sprite):
 class StartMenu(QWidget):
     def __init__(self):
         super().__init__()
+        self.stacked_widget = QStackedWidget()
+
+        self.mainmenu = MainMenu()
+        self.selectsong = SelectSong()
+        self.settings = Settings()
+
+        self.stacked_widget.addWidget(self.mainmenu)
+        self.stacked_widget.addWidget(self.selectsong)
+        self.stacked_widget.addWidget(self.settings)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.stacked_widget)
+        self.setLayout(layout)
+
+        self.stacked_widget.setCurrentIndex(0)
+
+        self.mainmenu.btn_levels.clicked.connect(lambda: self.switch_page(1))
+        self.mainmenu.btn_settings.clicked.connect(lambda: self.switch_page(2))
+
+    def switch_page(self, index):
+        self.stacked_widget.setCurrentIndex(index)
+
+
+class MainMenu(QWidget):
+    def __init__(self):
+        super().__init__()
         uic.loadUi('ui/StartMenu.ui', self)
         self.setWindowTitle(SCREEN_TITLE)
         self.setFixedSize(720, 600)
-        self.btn_play.clicked.connect(self.launch_game)
-        self.btn_levels.clicked.connect(self.open_levels)
-        self.btn_settings.clicked.connect(self.open_settings)
         self.btn_exit.clicked.connect(self.exit)
 
-    def launch_game(self):
-        global START_GAME
-        START_GAME = True
-        self.close()
-
-    def open_levels(self):
-        pass
-
-    def open_settings(self):
-        self.settings = Settings()
-        self.settings.show()
-
     def exit(self):
-        self.close()
+        self.window().close()
+
+
+class SelectSong(QWidget):
+    def __init__(self):
+        super().__init__()
+        uic.loadUi('ui/SelectSong.ui', self)
+        self.setWindowTitle('Select Song')
+        self.setFixedSize(800, 700)
+        self.btn_song_4nim0sity.clicked.connect(lambda: self.start_game('4nim0sity'))
+        self.btn_song_telepathy.clicked.connect(lambda: self.start_game('telepathy'))
+
+    def start_game(self, song):
+        global START_GAME, curr_song
+        START_GAME = True
+        curr_song = song
+        self.window().close()
 
 
 class Settings(QWidget):
