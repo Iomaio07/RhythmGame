@@ -166,6 +166,7 @@ class GameView(arcade.View):
 
         closest_note.remove_from_sprite_lists()
 
+    # добавить паузу на эскейп и всплывающее окно с возможностью выхода в меню
 
 class Note(arcade.Sprite):
     def __init__(self, filename, scale, time, row, type='normal'):
@@ -262,7 +263,7 @@ def main():
     app.exec()
 
     del app
-
+    # поменять тут логику
     if START_GAME:
         window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
         game_view = GameView()
