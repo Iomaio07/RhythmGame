@@ -1,0 +1,3 @@
+normal 2 3
+demon 4 4
+godly 6 1
