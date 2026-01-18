@@ -176,7 +176,7 @@ class Note(arcade.Sprite):
         self.radius = RADIUS
         self.speed_y = 200
         self.time = time
-        # для тестов
+        # для тестов, потом исправить на определение по рядам
         self.center_x = 150
         if type == 'normal':
             self.center_y = Y_FOR_BUTTON + self.speed_y * self.time
@@ -187,13 +187,20 @@ class Note(arcade.Sprite):
         self.center_y -= self.speed_y * delta_time
         self.time_to_button = self.time - curr_time
 
+class Slider(arcade.Sprite):
+    def __init__(self, filename, scale, time, row, type='normal'):
+        super().__init__(filename, scale)
+        self.type = type
+        self.row = row
+        self.radius = RADIUS
+        self.speed_y = 200
+        self.time = time
 
 class Button(arcade.Sprite):
     def __init__(self, filename, scale, key, type='normal'):
         super().__init__(filename, scale)
         self.type = type
         self.radius = RADIUS
-        self.is_clicked = False
         self.key = key
         if type == 'normal':
             self.center_y = Y_FOR_BUTTON
