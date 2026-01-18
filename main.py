@@ -186,6 +186,8 @@ class StartMenu(QWidget):
 
         self.mainmenu.btn_levels.clicked.connect(lambda: self.switch_page(1))
         self.mainmenu.btn_settings.clicked.connect(lambda: self.switch_page(2))
+        self.selectsong.btn_back.clicked.connect(lambda: self.switch_page(0))
+        self.settings.btn_back.clicked.connect(lambda: self.switch_page(0))
 
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
