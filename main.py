@@ -18,6 +18,9 @@ MISS_COEFF = 0
 START_GAME = False
 curr_time = 0
 curr_song = ''
+buttons_lst = [arcade.key.LEFT, arcade.key.DOWN, arcade.key.UP, arcade.key.RIGHT]
+godly_buttons_lst = [arcade.key.A, arcade.key.S, arcade.key.W, arcade.key.D]
+volume = 100
 
 
 # --- Секция Arcade ---
@@ -31,6 +34,9 @@ class GameView(arcade.View):
         self.score = 0
         self.setup()
         self.notes_from_txt(curr_song)
+        music = arcade.load_sound(f'sounds/{curr_song}.mp3')
+        arcade.play_sound(music, volume=volume / 100)
+        self.hit_sound = arcade.load_sound('sounds/hit_sound.mp3')
 
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
@@ -55,13 +61,12 @@ class GameView(arcade.View):
                     self.notes_list.append(self.note)
 
     def setup(self):
-        self.button1 = Button('img/Button.png', 0.5, arcade.key.LEFT)
-        self.button1.center_x = 150
-        self.godly_button1 = Button('img/Button.png', 0.5, arcade.key.A, type='Godly')
-        self.godly_button1.center_x = 150
+        for i in range(4):
+            self.button1 = Button('img/Btn_left.png', 0.5, buttons_lst[i], i + 1)
+            self.godly_button1 = Button('img/Button.png', 0.5, godly_buttons_lst[i], i + 1, type='Godly')
 
-        self.buttons_list.append(self.button1)
-        self.godly_buttons_list.append(self.godly_button1)
+            self.buttons_list.append(self.button1)
+            self.godly_buttons_list.append(self.godly_button1)
 
     def on_show_view(self):
         arcade.set_background_color(arcade.color.DARK_BLUE)
@@ -96,7 +101,7 @@ class GameView(arcade.View):
 
         closest_note = min(notes_hit_list,
                            key=lambda note: abs(note.center_y - button.center_y))
-
+        arcade.play_sound(self.hit_sound, volume=1)
         distance = abs(closest_note.center_y - button.center_y)
         if distance <= 10:
             accuracy = "PERFECT"
@@ -135,12 +140,11 @@ class Note(arcade.Sprite):
         global curr_time
         super().__init__(filename, scale)
         self.type = type
-        self.row = row
         self.radius = RADIUS
-        self.speed_y = 200
+        self.speed_y = 400
         self.time = time
-        # для тестов
-        self.center_x = 150
+        self.row = row
+        self.center_x = 200 * self.row
         if type == 'normal':
             self.center_y = Y_FOR_BUTTON + self.speed_y * self.time
         else:
@@ -152,12 +156,13 @@ class Note(arcade.Sprite):
 
 
 class Button(arcade.Sprite):
-    def __init__(self, filename, scale, key, type='normal'):
+    def __init__(self, filename, scale, key, row, type='normal'):
         super().__init__(filename, scale)
         self.type = type
         self.radius = RADIUS
         self.is_clicked = False
         self.key = key
+        self.center_x = 200 * row
         if type == 'normal':
             self.center_y = Y_FOR_BUTTON
         else:
@@ -243,8 +248,10 @@ class Settings(QWidget):
         self.tempFPS = self.lineEdit_FPS.text()
 
     def save_changes(self):
+        global volume
         self.FPS = self.tempFPS
         self.volume = self.tempvolume
+        volume = self.volume
 
 
 def main():
