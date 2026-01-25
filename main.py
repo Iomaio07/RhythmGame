@@ -1,7 +1,8 @@
 import sys
 from PyQt6 import uic
-from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout
+from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout, QMessageBox
 import arcade
+from ConfigManager import ConfigManager
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
@@ -20,7 +21,10 @@ curr_time = 0
 curr_song = ''
 buttons_lst = [arcade.key.LEFT, arcade.key.DOWN, arcade.key.UP, arcade.key.RIGHT]
 godly_buttons_lst = [arcade.key.A, arcade.key.S, arcade.key.W, arcade.key.D]
-volume = 100
+master_volume = 1
+music_volume = 1
+sfx_volume = 1
+fps = 60
 
 
 # --- Секция Arcade ---
@@ -35,8 +39,9 @@ class GameView(arcade.View):
         self.setup()
         self.notes_from_txt(curr_song)
         music = arcade.load_sound(f'sounds/{curr_song}.mp3')
-        arcade.play_sound(music, volume=volume / 100)
+        arcade.play_sound(music, volume=master_volume * music_volume)
         self.hit_sound = arcade.load_sound('sounds/hit_sound.mp3')
+
 
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
@@ -68,8 +73,15 @@ class GameView(arcade.View):
             self.buttons_list.append(self.button1)
             self.godly_buttons_list.append(self.godly_button1)
 
+            self.score_text = arcade.Text('0', 900, 750, arcade.color.WHITE, 24, anchor_x="center")
+
+            self.timer = 0
+            self.normal_size = 30
+            self.max_size = 40
+            self.target_size = self.normal_size
+
     def on_show_view(self):
-        arcade.set_background_color(arcade.color.DARK_BLUE)
+            arcade.set_background_color(arcade.color.DARK_BLUE)
 
     def on_draw(self):
         self.clear()
@@ -77,12 +89,25 @@ class GameView(arcade.View):
         self.godly_buttons_list.draw()
         self.notes_list.draw()
         self.godly_notes_list.draw()
+        self.score_text.draw()
 
     def on_update(self, delta_time):
         global curr_time
         self.notes_list.update()
         self.godly_notes_list.update()
         curr_time += delta_time
+
+        if self.timer > 0:
+            self.timer -= delta_time
+            if self.timer <= 0:
+                self.target_size = self.normal_size
+
+        dist = self.target_size - self.score_text.font_size
+
+        if abs(dist) > 0.1:
+            self.score_text.font_size += dist * 0.15
+        else:
+            self.score_text.font_size = self.target_size
 
     def on_key_press(self, key, modifiers):
         for button in self.buttons_list:
@@ -101,7 +126,7 @@ class GameView(arcade.View):
 
         closest_note = min(notes_hit_list,
                            key=lambda note: abs(note.center_y - button.center_y))
-        arcade.play_sound(self.hit_sound, volume=1)
+        arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
         distance = abs(closest_note.center_y - button.center_y)
         if distance <= 10:
             accuracy = "PERFECT"
@@ -123,7 +148,10 @@ class GameView(arcade.View):
         base_score = 100
         if is_godly:
             base_score *= GODLY_COEFF
-        self.score += int(base_score * score_mult)
+        self.score += int(base_score * score_mult) + int(self.score_text.text)
+        self.score_text.text = self.score
+        self.target_size = self.max_size
+        self.timer = 0.15
 
         if closest_note.type.lower() == 'demon':
             new_note = Note('img/Note.jpg', 0.5, 0,
@@ -232,26 +260,99 @@ class Settings(QWidget):
         uic.loadUi('ui/Settings.ui', self)
         self.setWindowTitle('Settings')
         self.setFixedSize(800, 700)
-        self.volume = self.SliderVolume.value()
-        self.tempvolume = self.volume
-        self.FPS = self.lineEdit_FPS.text()
-        self.tempFPS = self.FPS
-        self.lineEdit_FPS.textChanged.connect(self.change_FPS)
-        self.SliderVolume.valueChanged.connect(self.change_volume)
-        self.btn_save.clicked.connect(self.save_changes)
 
-    def change_volume(self):
-        self.tempvolume = self.SliderVolume.value()
-        self.LabelVolume.setText(f"{self.tempvolume}%")
+        self.cfg_mng = ConfigManager()
+
+        saved_settings = self.cfg_mng.load_settings_to_vars()
+
+        self.SliderMasterVolume.setValue(saved_settings['master_volume'])
+        self.SliderMusicVolume.setValue(saved_settings['music_volume'])
+        self.SliderSFXVolume.setValue(saved_settings['sfx_volume'])
+        self.lineEdit_FPS.setText(str(saved_settings['fps']))
+
+        self.master_volume = self.SliderMasterVolume.value()
+        self.music_volume = self.SliderMusicVolume.value()
+        self.sfx_volume = self.SliderSFXVolume.value()
+        self.FPS = self.lineEdit_FPS.text()
+
+        self.tempmastervolume = self.master_volume
+        self.tempmusicvolume = self.music_volume
+        self.tempsfxvolume = self.sfx_volume
+        self.tempFPS = self.FPS
+
+        self.Master_Volume.setText(f"{self.master_volume}%")
+        self.Music_Volume.setText(f"{self.music_volume}%")
+        self.SFX_Volume.setText(f"{self.sfx_volume}%")
+
+        self.lineEdit_FPS.textChanged.connect(self.change_FPS)
+        self.SliderMasterVolume.valueChanged.connect(self.change_master_volume)
+        self.SliderMusicVolume.valueChanged.connect(self.change_music_volume)
+        self.SliderSFXVolume.valueChanged.connect(self.change_sfx_volume)
+        self.btn_save.clicked.connect(self.save_changes)
+        self.btn_reset_defaults.clicked.connect(self.reset_to_defaults)
+
+    def change_master_volume(self):
+        self.tempmastervolume = self.SliderMasterVolume.value()
+        self.Master_Volume.setText(f"{self.tempmastervolume}%")
+
+    def change_music_volume(self):
+        self.tempmusicvolume = self.SliderMusicVolume.value()
+        self.Music_Volume.setText(f"{self.tempmusicvolume}%")
+
+
+    def change_sfx_volume(self):
+        self.tempsfxvolume = self.SliderSFXVolume.value()
+        self.SFX_Volume.setText(f"{self.tempsfxvolume}%")
+
 
     def change_FPS(self):
         self.tempFPS = self.lineEdit_FPS.text()
 
     def save_changes(self):
-        global volume
+        global master_volume, music_volume, sfx_volume, fps
         self.FPS = self.tempFPS
-        self.volume = self.tempvolume
-        volume = self.volume
+        self.master_volume = self.tempmastervolume
+        self.music_volume = self.tempmusicvolume
+        self.sfx_volume = self.tempsfxvolume
+        master_volume = self.master_volume / 100
+        music_volume = self.music_volume / 100
+        sfx_volume = self.sfx_volume / 100
+        fps = self.FPS
+
+        config_to_save = {
+            'master_volume': str(self.master_volume),
+            'music_volume': str(self.music_volume),
+            'sfx_volume': str(self.sfx_volume),
+            'fps': str(self.FPS)
+        }
+
+        with open('config.txt', 'w', encoding='utf-8') as f:
+            for key, value in config_to_save.items():
+                f.write(f"{key}={value}\n")
+
+    def reset_to_defaults(self):
+        """Сброс настроек к значениям по умолчанию"""
+        reply = QMessageBox.question(
+            self, 'Подтверждение',
+            'Вы уверены, что хотите сбросить настройки к значениям по умолчанию?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self.SliderMasterVolume.setValue(100)
+            self.SliderMusicVolume.setValue(100)
+            self.SliderSFXVolume.setValue(100)
+            self.lineEdit_FPS.setText("60")
+
+            self.tempmastervolume = 100
+            self.tempmusicvolume = 100
+            self.tempsfxvolume = 100
+            self.tempFPS = "60"
+
+            self.Master_Volume.setText("100%")
+            self.Music_Volume.setText("100%")
+            self.SFX_Volume.setText("100%")
 
 
 def main():

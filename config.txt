@@ -1,0 +1,4 @@
+master_volume=42
+music_volume=60
+sfx_volume=68
+fps=60
