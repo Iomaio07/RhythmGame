@@ -4,11 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1a2e30a8-2921-4469-87f8-edb9a5bddb6b" name="Changes" comment="4 ряда + музыка и hit_sounds">
-      <change afterPath="$PROJECT_DIR$/source/ConfigManager.py" afterDir="false" />
+    <list default="true" id="1a2e30a8-2921-4469-87f8-edb9a5bddb6b" name="Changes" comment="Разделение на музыку и sfx, также счёт и его анимация">
+      <change afterPath="$PROJECT_DIR$/source/Accuracity.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/source/Combo.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/Settings.ui" beforeDir="false" afterPath="$PROJECT_DIR$/ui/Settings.ui" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,17 +52,19 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
-    &quot;Python.main.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;4__rows&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/User/Documents/Python/rhythm_game&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;advanced.settings&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "Python.Accuracity.executor": "Run",
+    "Python.Combo.executor": "Run",
+    "Python.main.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "git-widget-placeholder": "4__rows",
+    "last_opened_file_path": "C:/Users/User/Documents/Python/rhythm_game",
+    "settings.editor.selected.configurable": "advanced.settings"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\User\Documents\Python\rhythm_game" />
@@ -147,7 +150,15 @@
       <option name="project" value="LOCAL" />
       <updated>1768989845427</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Разделение на музыку и sfx, также счёт и его анимация">
+      <option name="closed" value="true" />
+      <created>1769320830926</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1769320830926</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -178,6 +189,7 @@
     <MESSAGE value="Теперь все pyqt окна в одном виджете и переключаются по кнопкам, также игра принимает песню из названия кнопки" />
     <MESSAGE value="Добавил кнопки возврата в меню из выбора уровней и настроек" />
     <MESSAGE value="4 ряда + музыка и hit_sounds" />
-    <option name="LAST_COMMIT_MESSAGE" value="4 ряда + музыка и hit_sounds" />
+    <MESSAGE value="Разделение на музыку и sfx, также счёт и его анимация" />
+    <option name="LAST_COMMIT_MESSAGE" value="Разделение на музыку и sfx, также счёт и его анимация" />
   </component>
 </project>

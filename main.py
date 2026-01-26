@@ -3,6 +3,8 @@ from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout, QMessageBox
 import arcade
 from ConfigManager import ConfigManager
+from Accuracity import AccuracyText
+from Combo import ComboText
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
@@ -21,10 +23,13 @@ curr_time = 0
 curr_song = ''
 buttons_lst = [arcade.key.LEFT, arcade.key.DOWN, arcade.key.UP, arcade.key.RIGHT]
 godly_buttons_lst = [arcade.key.A, arcade.key.S, arcade.key.W, arcade.key.D]
-master_volume = 1
-music_volume = 1
-sfx_volume = 1
-fps = 60
+cfg_mng = ConfigManager()
+saved_settings = cfg_mng.load_settings_to_vars()
+master_volume = saved_settings['master_volume'] / 100
+music_volume = saved_settings['music_volume'] / 100
+sfx_volume = saved_settings['sfx_volume'] / 100
+fps = saved_settings['fps']
+
 
 
 # --- Секция Arcade ---
@@ -35,13 +40,27 @@ class GameView(arcade.View):
         self.godly_notes_list = arcade.SpriteList()
         self.buttons_list = arcade.SpriteList()
         self.godly_buttons_list = arcade.SpriteList()
-        self.score = 0
         self.setup()
         self.notes_from_txt(curr_song)
+        self.score = 0
+        self.combo = 0
+        self.full_combo = len(self.notes_list) + len(self.godly_notes_list)
+        self.stats = {'miss': 0, 'bad': 0, 'good': 0, 'great': 0, 'perfect': 0}
         music = arcade.load_sound(f'sounds/{curr_song}.mp3')
         arcade.play_sound(music, volume=master_volume * music_volume)
         self.hit_sound = arcade.load_sound('sounds/hit_sound.mp3')
 
+        self.accuracy_texts = []
+        self.accuracy_colors = {
+            "PERFECT": arcade.color.GOLD,
+            "GREAT": arcade.color.BLUE_SAPPHIRE,
+            "GOOD": arcade.color.CYAN,
+            "BAD": arcade.color.ORANGE,
+            "MISS": arcade.color.GRAY
+        }
+        self.animation_timer = 0
+        self.animation_interval = 1 / 60
+        self.combo_texts = []
 
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
@@ -54,15 +73,15 @@ class GameView(arcade.View):
             for elem in data:
                 if elem[0].lower() == 'demon':
                     sprite = 'img/DemonNote.jpg'
-                    self.note = Note(sprite, 0.5, int(elem[1]), int(elem[2]), elem[0])
+                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
                     self.godly_notes_list.append(self.note)
                 elif elem[0].lower() == 'godly':
                     sprite = 'img/GodlyNote.jpg'
-                    self.note = Note(sprite, 0.5, int(elem[1]), int(elem[2]), elem[0])
+                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
                     self.godly_notes_list.append(self.note)
                 else:
                     sprite = 'img/Note.jpg'
-                    self.note = Note(sprite, 0.5, int(elem[1]), int(elem[2]), elem[0])
+                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
                     self.notes_list.append(self.note)
 
     def setup(self):
@@ -75,13 +94,8 @@ class GameView(arcade.View):
 
             self.score_text = arcade.Text('0', 900, 750, arcade.color.WHITE, 24, anchor_x="center")
 
-            self.timer = 0
-            self.normal_size = 30
-            self.max_size = 40
-            self.target_size = self.normal_size
-
     def on_show_view(self):
-            arcade.set_background_color(arcade.color.DARK_BLUE)
+        arcade.set_background_color(arcade.color.DARK_BLUE)
 
     def on_draw(self):
         self.clear()
@@ -91,23 +105,43 @@ class GameView(arcade.View):
         self.godly_notes_list.draw()
         self.score_text.draw()
 
+        for text in self.accuracy_texts:
+            text.draw()
+
+        for combo in self.combo_texts:
+            combo.draw()
+
     def on_update(self, delta_time):
         global curr_time
         self.notes_list.update()
         self.godly_notes_list.update()
+        self.check_missed_notes()
         curr_time += delta_time
 
-        if self.timer > 0:
-            self.timer -= delta_time
-            if self.timer <= 0:
-                self.target_size = self.normal_size
+        self.animation_timer += delta_time
 
-        dist = self.target_size - self.score_text.font_size
+        while self.animation_timer >= self.animation_interval:
+            self.update_animations(self.animation_interval)
+            self.animation_timer -= self.animation_interval
 
-        if abs(dist) > 0.1:
-            self.score_text.font_size += dist * 0.15
-        else:
-            self.score_text.font_size = self.target_size
+    def update_animations(self, fixed_delta):
+        """Обновление анимаций для оптимизации"""
+        texts_to_remove = []
+        for i, accuracy_text in enumerate(self.accuracy_texts):
+            if not accuracy_text.update(fixed_delta):
+                texts_to_remove.append(i)
+
+        for index in reversed(texts_to_remove):
+            self.accuracy_texts.pop(index)
+
+        combos_to_remove = []
+        for i, combo_text in enumerate(self.combo_texts):
+            if not combo_text.update(fixed_delta):
+                combos_to_remove.append(i)
+
+        for index in reversed(combos_to_remove):
+            self.combo_texts.pop(index)
+
 
     def on_key_press(self, key, modifiers):
         for button in self.buttons_list:
@@ -117,6 +151,37 @@ class GameView(arcade.View):
         for button in self.godly_buttons_list:
             if key == button.key:
                 self.check_collisions(button, self.godly_notes_list, True)
+
+    def check_missed_notes(self):
+        """Проверяет ноты, которые пролетели мимо кнопок"""
+        notes_to_remove = []
+        for note in self.notes_list:
+            if note.center_y < Y_FOR_BUTTON - 50:
+                accuracy_text = AccuracyText("MISS", 500, 400)
+                accuracy_text.color = self.accuracy_colors["MISS"]
+                self.accuracy_texts.append(accuracy_text)
+                notes_to_remove.append(note)
+
+        for note in self.godly_notes_list:
+            if note.center_y < Y_FOR_GODLY_BUTTON - 50:
+                accuracy_text = AccuracyText("MISS", 500, 400)
+                accuracy_text.color = self.accuracy_colors["MISS"]
+                self.accuracy_texts.append(accuracy_text)
+                notes_to_remove.append(note)
+
+        for note in notes_to_remove:
+            if note in self.notes_list:
+                note.remove_from_sprite_lists()
+                self.combo = 0
+            elif note in self.godly_notes_list:
+                if note.type.lower() == 'demon':
+                    new_note = Note('img/Note.jpg', 0.5, 0,
+                                    note.row, 'normal')
+                    new_note.center_x = note.center_x
+                    new_note.center_y = note.center_y
+                    self.notes_list.append(new_note)
+                note.remove_from_sprite_lists()
+                self.combo = 0
 
     def check_collisions(self, button, notes_list, is_godly):
         notes_hit_list = arcade.check_for_collision_with_list(button, notes_list)
@@ -131,27 +196,36 @@ class GameView(arcade.View):
         if distance <= 10:
             accuracy = "PERFECT"
             score_mult = PERF_COEFF
+            self.combo += 1
         elif distance <= 15:
             accuracy = "GREAT"
             score_mult = GREAT_COEFF
+            self.combo += 1
         elif distance <= 20:
             accuracy = "GOOD"
             score_mult = GOOD_COEFF
+            self.combo = 0
         elif distance <= 50:
             accuracy = "BAD"
             score_mult = BAD_COEFF
+            self.combo = 0
         else:
             accuracy = "MISS"
             score_mult = MISS_COEFF
+            self.combo = 0
+        self.stats[accuracy.lower()] += 1
+        accuracy_text = AccuracyText(accuracy, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        accuracy_text.color = self.accuracy_colors.get(accuracy, arcade.color.WHITE)
+        self.accuracy_texts.append(accuracy_text)
 
-        print(accuracy)
+        combo_text = ComboText(self.combo, 400, 370)
+        self.combo_texts.append(combo_text)
+
         base_score = 100
         if is_godly:
             base_score *= GODLY_COEFF
         self.score += int(base_score * score_mult) + int(self.score_text.text)
         self.score_text.text = self.score
-        self.target_size = self.max_size
-        self.timer = 0.15
 
         if closest_note.type.lower() == 'demon':
             new_note = Note('img/Note.jpg', 0.5, 0,
@@ -261,9 +335,8 @@ class Settings(QWidget):
         self.setWindowTitle('Settings')
         self.setFixedSize(800, 700)
 
-        self.cfg_mng = ConfigManager()
 
-        saved_settings = self.cfg_mng.load_settings_to_vars()
+        saved_settings = cfg_mng.load_settings_to_vars()
 
         self.SliderMasterVolume.setValue(saved_settings['master_volume'])
         self.SliderMusicVolume.setValue(saved_settings['music_volume'])
@@ -299,11 +372,9 @@ class Settings(QWidget):
         self.tempmusicvolume = self.SliderMusicVolume.value()
         self.Music_Volume.setText(f"{self.tempmusicvolume}%")
 
-
     def change_sfx_volume(self):
         self.tempsfxvolume = self.SliderSFXVolume.value()
         self.SFX_Volume.setText(f"{self.tempsfxvolume}%")
-
 
     def change_FPS(self):
         self.tempFPS = self.lineEdit_FPS.text()
