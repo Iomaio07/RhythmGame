@@ -5,14 +5,14 @@ import arcade
 from ConfigManager import ConfigManager
 from Accuracity import AccuracyText
 from Combo import ComboText
+import time
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
 SCREEN_TITLE = 'God Rhythms You'
 Y_FOR_BUTTON = 100
 Y_FOR_GODLY_BUTTON = 300
-RADIUS = 40
-GODLY_COEFF = 2
+GODLY_COEFF = 1.5
 PERF_COEFF = 2
 GREAT_COEFF = 1.5
 GOOD_COEFF = 1
@@ -31,7 +31,6 @@ sfx_volume = saved_settings['sfx_volume'] / 100
 fps = saved_settings['fps']
 
 
-
 # --- Секция Arcade ---
 class GameView(arcade.View):
     def __init__(self):
@@ -40,6 +39,9 @@ class GameView(arcade.View):
         self.godly_notes_list = arcade.SpriteList()
         self.buttons_list = arcade.SpriteList()
         self.godly_buttons_list = arcade.SpriteList()
+        self.slider_ends = arcade.SpriteList()
+        self.slider_bodies = []
+        self.held_notes = []
         self.setup()
         self.notes_from_txt(curr_song)
         self.score = 0
@@ -62,27 +64,55 @@ class GameView(arcade.View):
         self.animation_interval = 1 / 60
         self.combo_texts = []
 
+        self.start_time = time.perf_counter()
+
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
-        # Порядок - тип ноты, время, ряд
         with open(f'songs/{song_name}.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()
             data = []
             for _ in lines:
                 data.append(_.split())
             for elem in data:
-                if elem[0].lower() == 'demon':
-                    sprite = 'img/DemonNote.jpg'
-                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
-                    self.godly_notes_list.append(self.note)
-                elif elem[0].lower() == 'godly':
-                    sprite = 'img/GodlyNote.jpg'
-                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
-                    self.godly_notes_list.append(self.note)
+                note_type = elem[0].lower()
+                time = float(elem[1])
+                row = int(elem[2])
+                if len(elem) == 4:
+                    duration = float(elem[3])
+                    if note_type == 's':
+                        sprite = 'img/SliderStart.jpg'
+                        note = Note(sprite, 0.5, time, row, 'normal', duration)
+                        self.notes_list.append(note)
+
+                        slider_end = SliderEnd('img/SliderEnd.png', 0.5, time + duration, row, note)
+                        self.slider_ends.append(slider_end)
+
+                        slider_body = SliderBody(note, slider_end)
+                        self.slider_bodies.append(slider_body)
+
+                    elif note_type == 'gs':
+                        sprite = 'img/GodlySliderStart.jpg'
+                        note = Note(sprite, 0.5, time, row, 'godly', duration)
+                        self.godly_notes_list.append(note)
+
+                        slider_end = SliderEnd('img/GodlySliderEnd.jpg', 0.5, time + duration, row, note)
+                        self.slider_ends.append(slider_end)
+
+                        slider_body = SliderBody(note, slider_end)
+                        self.slider_bodies.append(slider_body)
                 else:
-                    sprite = 'img/Note.jpg'
-                    self.note = Note(sprite, 0.5, float(elem[1]), int(elem[2]), elem[0])
-                    self.notes_list.append(self.note)
+                    if note_type == 'd':
+                        sprite = 'img/DemonNote.jpg'
+                        note = Note(sprite, 0.5, time, row, 'demon')
+                        self.godly_notes_list.append(note)
+                    elif note_type == 'g':
+                        sprite = 'img/GodlyNote.jpg'
+                        note = Note(sprite, 0.5, time, row, 'godly')
+                        self.godly_notes_list.append(note)
+                    else:
+                        sprite = 'img/Note.jpg'
+                        note = Note(sprite, 0.5, time, row, 'normal')
+                        self.notes_list.append(note)
 
     def setup(self):
         for i in range(4):
@@ -94,6 +124,8 @@ class GameView(arcade.View):
 
             self.score_text = arcade.Text('0', 900, 750, arcade.color.WHITE, 24, anchor_x="center")
 
+            self.timer = 0
+
     def on_show_view(self):
         arcade.set_background_color(arcade.color.DARK_BLUE)
 
@@ -101,8 +133,13 @@ class GameView(arcade.View):
         self.clear()
         self.buttons_list.draw()
         self.godly_buttons_list.draw()
+
+        for slider_body in self.slider_bodies:
+            slider_body.draw()
+
         self.notes_list.draw()
         self.godly_notes_list.draw()
+        self.slider_ends.draw()
         self.score_text.draw()
 
         for text in self.accuracy_texts:
@@ -116,7 +153,56 @@ class GameView(arcade.View):
         self.notes_list.update()
         self.godly_notes_list.update()
         self.check_missed_notes()
-        curr_time += delta_time
+        self.slider_ends.update()
+
+        for slider_body in self.slider_bodies:
+            slider_body.update()
+
+            if slider_body.is_held:
+                score_to_add = slider_body.update_hold_score()
+                if score_to_add > 0:
+                    self.score += score_to_add
+                    self.score_text.text = str(self.score)
+
+        slider_ends_to_remove = []
+
+        for slider_end in self.slider_ends:
+            if slider_end.center_y < (Y_FOR_BUTTON if slider_end.parent_note.type == 'normal' else Y_FOR_GODLY_BUTTON):
+                slider_body = next((sb for sb in self.slider_bodies if sb.slider_end == slider_end), None)
+
+                if slider_body:
+                    if not slider_body.accuracy_shown:
+                        final_accuracy = slider_body.get_final_accuracy()
+
+                        accuracy_text = AccuracyText(final_accuracy, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                        accuracy_text.color = self.accuracy_colors.get(final_accuracy, arcade.color.WHITE)
+                        self.accuracy_texts.append(accuracy_text)
+                        slider_body.mark_accuracy_shown()
+
+                        if final_accuracy in ["PERFECT", "GREAT", "GOOD"]:
+                            self.combo += 1
+                            self.stats[final_accuracy.lower()] += 1
+
+                            combo_text = ComboText(self.combo, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+                            self.combo_texts.append(combo_text)
+                        elif final_accuracy == "BAD":
+                            self.combo = max(0, self.combo - 1)
+                            self.stats[final_accuracy.lower()] += 1
+                        elif final_accuracy == "MISS":
+                            self.combo = 0
+                            self.stats[final_accuracy.lower()] += 1
+
+                    if slider_body in self.held_notes:
+                        self.held_notes.remove(slider_body)
+
+                slider_ends_to_remove.append((slider_end, slider_body))
+
+        for slider_end, slider_body in slider_ends_to_remove:
+            slider_end.remove_from_sprite_lists()
+            if slider_body and slider_body in self.slider_bodies:
+                self.slider_bodies.remove(slider_body)
+
+        curr_time = time.perf_counter() - self.start_time
 
         self.animation_timer += delta_time
 
@@ -142,7 +228,6 @@ class GameView(arcade.View):
         for index in reversed(combos_to_remove):
             self.combo_texts.pop(index)
 
-
     def on_key_press(self, key, modifiers):
         for button in self.buttons_list:
             if key == button.key:
@@ -152,18 +237,81 @@ class GameView(arcade.View):
             if key == button.key:
                 self.check_collisions(button, self.godly_notes_list, True)
 
+    def on_key_release(self, key, modifiers):
+        notes_to_release = []
+        for note in self.held_notes:
+            if hasattr(note, 'type'):
+                if note.type == 'normal':
+                    target_button = next((b for b in self.buttons_list if b.row == note.row), None)
+                    if target_button and key == target_button.key:
+                        notes_to_release.append(note)
+                else:
+                    target_button = next((b for b in self.godly_buttons_list
+                                          if b.row == note.row), None)
+                    if target_button and key == target_button.key:
+                        notes_to_release.append(note)
+
+        for note in notes_to_release:
+            note.release_hold()
+            if note in self.held_notes:
+                self.held_notes.remove(note)
+
+        sliders_to_release = []
+        for slider_body in self.held_notes:
+            if hasattr(slider_body, 'note'):
+                if slider_body.note.type == 'normal':
+                    target_button = next((b for b in self.buttons_list if b.row == slider_body.note.row), None)
+                    if target_button and key == target_button.key:
+                        sliders_to_release.append(slider_body)
+                else:
+                    target_button = next((b for b in self.godly_buttons_list
+                                          if b.row == slider_body.note.row), None)
+                    if target_button and key == target_button.key:
+                        sliders_to_release.append(slider_body)
+
+        for slider_body in sliders_to_release:
+            accuracy = slider_body.release_hold()
+
+            if accuracy and not slider_body.accuracy_shown:
+                accuracy_text = AccuracyText(accuracy, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+                accuracy_text.color = self.accuracy_colors.get(accuracy, arcade.color.WHITE)
+                self.accuracy_texts.append(accuracy_text)
+                slider_body.mark_accuracy_shown()
+
+                if accuracy in ["PERFECT", "GREAT", "GOOD"]:
+                    self.combo += 1
+                    self.stats[accuracy.lower()] += 1
+
+                    combo_text = ComboText(self.combo, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+                    self.combo_texts.append(combo_text)
+                elif accuracy == "BAD":
+                    self.combo = max(0, self.combo - 1)
+                    self.stats[accuracy.lower()] += 1
+                elif accuracy == "MISS":
+                    self.combo = 0
+                    self.stats[accuracy.lower()] += 1
+
+            if slider_body in self.held_notes:
+                self.held_notes.remove(slider_body)
+
+            if slider_body in self.slider_bodies:
+                self.slider_bodies.remove(slider_body)
+
     def check_missed_notes(self):
         """Проверяет ноты, которые пролетели мимо кнопок"""
         notes_to_remove = []
         for note in self.notes_list:
-            if note.center_y < Y_FOR_BUTTON - 50:
+            if note.is_slider and note.is_held:
+                continue
+
+            if note.center_y < Y_FOR_BUTTON - 100:
                 accuracy_text = AccuracyText("MISS", 500, 400)
                 accuracy_text.color = self.accuracy_colors["MISS"]
                 self.accuracy_texts.append(accuracy_text)
                 notes_to_remove.append(note)
 
         for note in self.godly_notes_list:
-            if note.center_y < Y_FOR_GODLY_BUTTON - 50:
+            if note.center_y < Y_FOR_GODLY_BUTTON - 100:
                 accuracy_text = AccuracyText("MISS", 500, 400)
                 accuracy_text.color = self.accuracy_colors["MISS"]
                 self.accuracy_texts.append(accuracy_text)
@@ -191,20 +339,35 @@ class GameView(arcade.View):
 
         closest_note = min(notes_hit_list,
                            key=lambda note: abs(note.center_y - button.center_y))
+
+        if closest_note.is_slider:
+            distance = abs(closest_note.center_y - button.center_y)
+            if distance <= 30:
+                closest_note.remove_from_sprite_lists()
+                arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
+
+                slider_body = next((sb for sb in self.slider_bodies
+                                    if sb.note == closest_note), None)
+                if slider_body:
+                    slider_body.start_hold()
+                    self.held_notes.append(slider_body)
+
+                return
+
         arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
         distance = abs(closest_note.center_y - button.center_y)
-        if distance <= 10:
+        if distance <= 15:
             accuracy = "PERFECT"
             score_mult = PERF_COEFF
             self.combo += 1
-        elif distance <= 15:
+        elif distance <= 20:
             accuracy = "GREAT"
             score_mult = GREAT_COEFF
             self.combo += 1
-        elif distance <= 20:
+        elif distance <= 30:
             accuracy = "GOOD"
             score_mult = GOOD_COEFF
-            self.combo = 0
+            self.combo += 1
         elif distance <= 50:
             accuracy = "BAD"
             score_mult = BAD_COEFF
@@ -217,14 +380,13 @@ class GameView(arcade.View):
         accuracy_text = AccuracyText(accuracy, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         accuracy_text.color = self.accuracy_colors.get(accuracy, arcade.color.WHITE)
         self.accuracy_texts.append(accuracy_text)
-
         combo_text = ComboText(self.combo, 400, 370)
         self.combo_texts.append(combo_text)
 
         base_score = 100
         if is_godly:
             base_score *= GODLY_COEFF
-        self.score += int(base_score * score_mult) + int(self.score_text.text)
+        self.score += int(base_score * score_mult)
         self.score_text.text = self.score
 
         if closest_note.type.lower() == 'demon':
@@ -238,33 +400,214 @@ class GameView(arcade.View):
 
 
 class Note(arcade.Sprite):
-    def __init__(self, filename, scale, time, row, type='normal'):
+    def __init__(self, filename, scale, time, row, type='normal', duration=0):
         global curr_time
         super().__init__(filename, scale)
         self.type = type
-        self.radius = RADIUS
         self.speed_y = 400
         self.time = time
         self.row = row
         self.center_x = 200 * self.row
-        if type == 'normal':
-            self.center_y = Y_FOR_BUTTON + self.speed_y * self.time
+        self.time_until_hit = self.time - curr_time
+
+        self.duration = duration
+        self.is_slider = duration > 0
+        self.end_time = self.time + self.duration
+        self.is_held = False
+        self.hold_start_time = None
+        self.progress = 0
+        self.slider_end = None
+
+        self.slider_body = None
+        if self.duration > 0:
+            self.slider_color = arcade.color.YELLOW
+            self.slider_width = 30
+            self.slider_height = 0
+
+        if self.type == 'normal':
+            self.target_y = Y_FOR_BUTTON
         else:
-            self.center_y = Y_FOR_GODLY_BUTTON + self.speed_y * self.time
+            self.target_y = Y_FOR_GODLY_BUTTON
+        self.center_y = self.target_y + self.speed_y * self.time_until_hit
 
     def update(self, delta_time):
-        self.center_y -= self.speed_y * delta_time
-        self.time_to_button = self.time - curr_time
+        self.time_until_hit = self.time - curr_time
+        self.center_y = self.target_y + self.speed_y * self.time_until_hit
+
+        if self.is_slider and self.slider_end:
+            # Всегда показываем полную длину слайдера от ноты до конца
+            height_diff = self.slider_end.center_y - self.center_y
+            self.slider_height = max(0, height_diff)
+
+            # Меняем цвет только в зависимости от удержания
+            if self.is_held:
+                self.slider_color = arcade.color.GREEN
+            else:
+                self.slider_color = arcade.color.YELLOW
+
+    def start_hold(self):
+        self.is_held = True
+        self.hold_start_time = curr_time
+        self.color = arcade.color.GREEN
+
+    def release_hold(self):
+        self.is_held = False
+        self.color = arcade.color.WHITE
+
+
+class SliderBody(arcade.Sprite):
+    def __init__(self, note, slider_end):
+        super().__init__()
+        self.note = note
+        self.slider_end = slider_end
+        self.color = arcade.color.YELLOW
+        self.width = 30
+        self.is_held = False
+        self.hold_start_time = None
+        self.duration = note.duration
+        self.last_score_time = curr_time
+        self.score_interval = 0.1
+        self.hold_score = 0
+        self.max_score = 100
+        self.total_score_added = 0
+        self.score_per_interval = 5
+        self.accuracy_shown = False
+        self.hold_progress = 0.0
+
+    def update(self):
+        if self.note and self.slider_end:
+            self.center_x = self.note.center_x
+            self.center_y = (self.note.center_y + self.slider_end.center_y) / 2
+            self.height = abs(self.slider_end.center_y - self.note.center_y)
+
+            if self.is_held:
+                self.color = arcade.color.GREEN
+                if self.hold_start_time is not None:
+                    hold_duration = curr_time - self.hold_start_time
+                    self.hold_progress = min(1.0, hold_duration / self.duration)
+            else:
+                self.color = arcade.color.YELLOW
+
+    def draw(self):
+        """Отрисовка тела слайдера"""
+        if self.height > 0:
+            arcade.draw_lrbt_rectangle_filled(
+                self.center_x - self.width / 2,
+                self.center_x + self.width / 2,
+                min(self.note.center_y, self.slider_end.center_y),
+                max(self.note.center_y, self.slider_end.center_y),
+                self.color
+            )
+
+    def start_hold(self):
+        self.is_held = True
+        self.hold_start_time = curr_time
+        self.last_score_time = curr_time
+        self.hold_score = 0
+        self.total_score_added = 0
+        self.accuracy_shown = False
+        self.hold_progress = 0.0
+
+    def release_hold(self):
+        self.is_held = False
+        if not self.accuracy_shown:
+            accuracy = self.get_accuracy_for_release()
+            return accuracy
+        return None
+
+    def update_hold_score(self):
+        """Обновляет очки за удержание"""
+        if not self.is_held or self.hold_start_time is None:
+            return 0
+
+        if curr_time - self.last_score_time < self.score_interval:
+            return 0
+
+        hold_duration = curr_time - self.hold_start_time
+        self.hold_progress = min(1.0, hold_duration / self.duration)
+
+        if self.hold_progress < 1.0:
+            score_to_add = self.score_per_interval
+            self.total_score_added += score_to_add
+            self.hold_score += score_to_add
+            self.last_score_time = curr_time
+            return score_to_add
+        else:
+            remaining_score = max(0, self.max_score - self.total_score_added)
+            if remaining_score > 0:
+                self.total_score_added += remaining_score
+                self.hold_score += remaining_score
+                return remaining_score
+
+        return 0
+
+    def get_accuracy_for_release(self):
+        """Определяет точность при отпускании слайдера"""
+        if self.hold_progress >= 0.9:
+            return "PERFECT"
+        elif self.hold_progress >= 0.7:
+            return "GREAT"
+        elif self.hold_progress >= 0.5:
+            return "GOOD"
+        elif self.hold_progress > 0:
+            return "BAD"
+        else:
+            return "MISS"
+
+    def get_final_accuracy(self):
+        """Определяет итоговую точность удержания слайдера (при достижении конца)"""
+        hold_ratio = self.total_score_added / self.max_score if self.max_score > 0 else 0
+
+        if hold_ratio >= 0.9:
+            return "PERFECT"
+        elif hold_ratio >= 0.7:
+            return "GREAT"
+        elif hold_ratio >= 0.5:
+            return "GOOD"
+        elif hold_ratio > 0:
+            return "BAD"
+        else:
+            return "MISS"
+
+    def get_total_hold_score(self):
+        """Возвращает общее количество очков за удержание"""
+        return int(self.hold_score)
+
+    def mark_accuracy_shown(self):
+        """Отмечаем, что точность была показана"""
+        self.accuracy_shown = True
+
+
+class SliderEnd(arcade.Sprite):
+    def __init__(self, filename, scale, time, row, parent_note):
+        super().__init__(filename, scale)
+        self.time = time
+        self.row = row
+        self.parent_note = parent_note
+        self.center_x = 200 * self.row
+
+        if parent_note.type == 'normal':
+            self.target_y = Y_FOR_BUTTON
+        else:
+            self.target_y = Y_FOR_GODLY_BUTTON
+
+        self.time_until_hit = self.time - curr_time
+        self.speed_y = 400
+        self.center_y = self.target_y + self.speed_y * self.time_until_hit
+
+    def update(self, delta_time):
+        self.time_until_hit = self.time - curr_time
+        self.center_y = self.target_y + self.speed_y * self.time_until_hit
 
 
 class Button(arcade.Sprite):
     def __init__(self, filename, scale, key, row, type='normal'):
         super().__init__(filename, scale)
         self.type = type
-        self.radius = RADIUS
         self.is_clicked = False
         self.key = key
         self.center_x = 200 * row
+        self.row = row
         if type == 'normal':
             self.center_y = Y_FOR_BUTTON
         else:
@@ -334,7 +677,6 @@ class Settings(QWidget):
         uic.loadUi('ui/Settings.ui', self)
         self.setWindowTitle('Settings')
         self.setFixedSize(800, 700)
-
 
         saved_settings = cfg_mng.load_settings_to_vars()
 
@@ -435,7 +777,7 @@ def main():
     del app
 
     if START_GAME:
-        window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, update_rate=1 / int(fps))
         game_view = GameView()
         window.show_view(game_view)
         arcade.run()
