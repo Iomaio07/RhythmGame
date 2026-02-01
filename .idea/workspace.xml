@@ -4,9 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1a2e30a8-2921-4469-87f8-edb9a5bddb6b" name="Changes" comment="Комбо и точность, обработка пропущенных нот и ведение статистики">
+    <list default="true" id="1a2e30a8-2921-4469-87f8-edb9a5bddb6b" name="Changes" comment="СЛАЙДЕРЫЫЫЫЫЫ">
+      <change afterPath="$PROJECT_DIR$/source/Results.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.txt" beforeDir="false" afterPath="$PROJECT_DIR$/config.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/config.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/img/Btn_left.png" beforeDir="false" afterPath="$PROJECT_DIR$/img/Btn_left.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/songs/4nim0sity.txt" beforeDir="false" afterPath="$PROJECT_DIR$/songs/4nim0sity.txt" afterDir="false" />
     </list>
@@ -57,6 +60,7 @@
     "Python.Accuracity.executor": "Run",
     "Python.Combo.executor": "Run",
     "Python.Notes.executor": "Run",
+    "Python.Results.executor": "Run",
     "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
@@ -166,7 +170,23 @@
       <option name="project" value="LOCAL" />
       <updated>1769437142074</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="СЛАЙДЕРЫЫЫЫЫЫ">
+      <option name="closed" value="true" />
+      <created>1769679828422</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1769679828422</updated>
+    </task>
+    <task id="LOCAL-00012" summary="СЛАЙДЕРЫЫЫЫЫЫ">
+      <option name="closed" value="true" />
+      <created>1769679864063</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1769679864063</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -199,6 +219,7 @@
     <MESSAGE value="4 ряда + музыка и hit_sounds" />
     <MESSAGE value="Разделение на музыку и sfx, также счёт и его анимация" />
     <MESSAGE value="Комбо и точность, обработка пропущенных нот и ведение статистики" />
-    <option name="LAST_COMMIT_MESSAGE" value="Комбо и точность, обработка пропущенных нот и ведение статистики" />
+    <MESSAGE value="СЛАЙДЕРЫЫЫЫЫЫ" />
+    <option name="LAST_COMMIT_MESSAGE" value="СЛАЙДЕРЫЫЫЫЫЫ" />
   </component>
 </project>

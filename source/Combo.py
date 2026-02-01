@@ -7,7 +7,7 @@ class ComboText:
         self.text = str(text)
         self.x = x
         self.y = y
-        self.lifetime = 1 # Время отображения в секундах
+        self.lifetime = 1  # Время отображения в секундах
         self.alpha = 255
         self.font_size = 36
         self.color = arcade.color.GRAY

@@ -5,6 +5,7 @@ import arcade
 from ConfigManager import ConfigManager
 from Accuracity import AccuracyText
 from Combo import ComboText
+from Results import ResultsView
 import time
 
 SCREEN_WIDTH = 1000
@@ -12,6 +13,7 @@ SCREEN_HEIGHT = 800
 SCREEN_TITLE = 'God Rhythms You'
 Y_FOR_BUTTON = 100
 Y_FOR_GODLY_BUTTON = 300
+NOTE_SPEED = 600
 GODLY_COEFF = 1.5
 PERF_COEFF = 2
 GREAT_COEFF = 1.5
@@ -23,6 +25,8 @@ curr_time = 0
 curr_song = ''
 buttons_lst = [arcade.key.LEFT, arcade.key.DOWN, arcade.key.UP, arcade.key.RIGHT]
 godly_buttons_lst = [arcade.key.A, arcade.key.S, arcade.key.W, arcade.key.D]
+btn_texture_lst = ['img/Btn_left.png', 'img/Btn_down.png', 'img/Btn_up.png', 'img/Btn_right.png']
+godly_btn_texture_lst = ['img/Btn_a.png', 'img/Btn_s.png', 'img/Btn_w.png', 'img/Btn_d.png']
 cfg_mng = ConfigManager()
 saved_settings = cfg_mng.load_settings_to_vars()
 master_volume = saved_settings['master_volume'] / 100
@@ -46,7 +50,9 @@ class GameView(arcade.View):
         self.notes_from_txt(curr_song)
         self.score = 0
         self.combo = 0
+        self.max_combo = 0
         self.full_combo = len(self.notes_list) + len(self.godly_notes_list)
+        self.game_completed = False
         self.stats = {'miss': 0, 'bad': 0, 'good': 0, 'great': 0, 'perfect': 0}
         music = arcade.load_sound(f'sounds/{curr_song}.mp3')
         arcade.play_sound(music, volume=master_volume * music_volume)
@@ -55,8 +61,8 @@ class GameView(arcade.View):
         self.accuracy_texts = []
         self.accuracy_colors = {
             "PERFECT": arcade.color.GOLD,
-            "GREAT": arcade.color.BLUE_SAPPHIRE,
-            "GOOD": arcade.color.CYAN,
+            "GREAT": arcade.color.CYAN,
+            "GOOD": arcade.color.BLUE_SAPPHIRE,
             "BAD": arcade.color.ORANGE,
             "MISS": arcade.color.GRAY
         }
@@ -116,8 +122,8 @@ class GameView(arcade.View):
 
     def setup(self):
         for i in range(4):
-            self.button1 = Button('img/Btn_left.png', 0.5, buttons_lst[i], i + 1)
-            self.godly_button1 = Button('img/Button.png', 0.5, godly_buttons_lst[i], i + 1, type='Godly')
+            self.button1 = Button(btn_texture_lst[i], 0.5, buttons_lst[i], i + 1)
+            self.godly_button1 = Button(godly_btn_texture_lst[i], 0.5, godly_buttons_lst[i], i + 1, type='Godly')
 
             self.buttons_list.append(self.button1)
             self.godly_buttons_list.append(self.godly_button1)
@@ -154,6 +160,32 @@ class GameView(arcade.View):
         self.godly_notes_list.update()
         self.check_missed_notes()
         self.slider_ends.update()
+
+        if self.combo > self.max_combo:
+            self.max_combo = self.combo
+
+        if not self.game_completed:
+            total_notes_left = (len(self.notes_list) +
+                                len(self.godly_notes_list) +
+                                len(self.slider_ends))
+
+            if total_notes_left == 0:
+                self.game_completed = True
+                self.show_results_delay = 1.0
+            else:
+                self.show_results_delay = None
+
+        if self.show_results_delay is not None:
+            self.show_results_delay -= delta_time
+            if self.show_results_delay <= 0:
+                results_view = ResultsView(
+                    score=self.score,
+                    combo=self.max_combo,
+                    full_combo=self.full_combo,
+                    stats=self.stats
+                )
+                self.window.show_view(results_view)
+                return
 
         for slider_body in self.slider_bodies:
             slider_body.update()
@@ -321,6 +353,7 @@ class GameView(arcade.View):
             if note in self.notes_list:
                 note.remove_from_sprite_lists()
                 self.combo = 0
+                self.stats['miss'] += 1
             elif note in self.godly_notes_list:
                 if note.type.lower() == 'demon':
                     new_note = Note('img/Note.jpg', 0.5, 0,
@@ -340,9 +373,11 @@ class GameView(arcade.View):
         closest_note = min(notes_hit_list,
                            key=lambda note: abs(note.center_y - button.center_y))
 
+        distance = abs(closest_note.center_y - button.center_y)
+        timing = distance / NOTE_SPEED
         if closest_note.is_slider:
-            distance = abs(closest_note.center_y - button.center_y)
-            if distance <= 30:
+
+            if distance <= 80:
                 closest_note.remove_from_sprite_lists()
                 arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
 
@@ -355,20 +390,20 @@ class GameView(arcade.View):
                 return
 
         arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
-        distance = abs(closest_note.center_y - button.center_y)
-        if distance <= 15:
+
+        if timing <= 0.04:
             accuracy = "PERFECT"
             score_mult = PERF_COEFF
             self.combo += 1
-        elif distance <= 20:
+        elif timing <= 0.055:
             accuracy = "GREAT"
             score_mult = GREAT_COEFF
             self.combo += 1
-        elif distance <= 30:
+        elif timing <= 0.08:
             accuracy = "GOOD"
             score_mult = GOOD_COEFF
             self.combo += 1
-        elif distance <= 50:
+        elif timing <= 0.12:
             accuracy = "BAD"
             score_mult = BAD_COEFF
             self.combo = 0
@@ -404,7 +439,7 @@ class Note(arcade.Sprite):
         global curr_time
         super().__init__(filename, scale)
         self.type = type
-        self.speed_y = 400
+        self.speed_y = NOTE_SPEED
         self.time = time
         self.row = row
         self.center_x = 200 * self.row
@@ -435,11 +470,9 @@ class Note(arcade.Sprite):
         self.center_y = self.target_y + self.speed_y * self.time_until_hit
 
         if self.is_slider and self.slider_end:
-            # Всегда показываем полную длину слайдера от ноты до конца
             height_diff = self.slider_end.center_y - self.center_y
             self.slider_height = max(0, height_diff)
 
-            # Меняем цвет только в зависимости от удержания
             if self.is_held:
                 self.slider_color = arcade.color.GREEN
             else:
@@ -468,8 +501,7 @@ class SliderBody(arcade.Sprite):
         self.last_score_time = curr_time
         self.score_interval = 0.1
         self.hold_score = 0
-        self.max_score = 100
-        self.total_score_added = 0
+        self.max_score = 50 * self.duration
         self.score_per_interval = 5
         self.accuracy_shown = False
         self.hold_progress = 0.0
@@ -504,7 +536,6 @@ class SliderBody(arcade.Sprite):
         self.hold_start_time = curr_time
         self.last_score_time = curr_time
         self.hold_score = 0
-        self.total_score_added = 0
         self.accuracy_shown = False
         self.hold_progress = 0.0
 
@@ -528,16 +559,9 @@ class SliderBody(arcade.Sprite):
 
         if self.hold_progress < 1.0:
             score_to_add = self.score_per_interval
-            self.total_score_added += score_to_add
             self.hold_score += score_to_add
             self.last_score_time = curr_time
             return score_to_add
-        else:
-            remaining_score = max(0, self.max_score - self.total_score_added)
-            if remaining_score > 0:
-                self.total_score_added += remaining_score
-                self.hold_score += remaining_score
-                return remaining_score
 
         return 0
 
@@ -555,26 +579,22 @@ class SliderBody(arcade.Sprite):
             return "MISS"
 
     def get_final_accuracy(self):
-        """Определяет итоговую точность удержания слайдера (при достижении конца)"""
-        hold_ratio = self.total_score_added / self.max_score if self.max_score > 0 else 0
-
-        if hold_ratio >= 0.9:
+        """Определяет точность удержания слайдера при достижении конца"""
+        if self.hold_progress >= 0.9:
             return "PERFECT"
-        elif hold_ratio >= 0.7:
+        elif self.hold_progress >= 0.7:
             return "GREAT"
-        elif hold_ratio >= 0.5:
+        elif self.hold_progress >= 0.5:
             return "GOOD"
-        elif hold_ratio > 0:
+        elif self.hold_progress > 0:
             return "BAD"
         else:
             return "MISS"
 
     def get_total_hold_score(self):
-        """Возвращает общее количество очков за удержание"""
         return int(self.hold_score)
 
     def mark_accuracy_shown(self):
-        """Отмечаем, что точность была показана"""
         self.accuracy_shown = True
 
 
@@ -592,7 +612,7 @@ class SliderEnd(arcade.Sprite):
             self.target_y = Y_FOR_GODLY_BUTTON
 
         self.time_until_hit = self.time - curr_time
-        self.speed_y = 400
+        self.speed_y = NOTE_SPEED
         self.center_y = self.target_y + self.speed_y * self.time_until_hit
 
     def update(self, delta_time):
