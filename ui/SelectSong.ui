@@ -31,7 +31,7 @@
     <string>4nim0sity</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="btn_song_telepathy">
+  <widget class="QPushButton" name="btn_song_butcher_vanity">
    <property name="geometry">
     <rect>
      <x>390</x>
@@ -46,7 +46,7 @@
     </font>
    </property>
    <property name="text">
-    <string>Telepathy</string>
+    <string>Butcher Vanity</string>
    </property>
   </widget>
   <widget class="QPushButton" name="btn_back">

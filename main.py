@@ -2,11 +2,14 @@ import sys
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout, QMessageBox
 import arcade
+from arcade.particles import FadeParticle, Emitter, EmitBurst, EmitInterval, EmitMaintainCount
 from ConfigManager import ConfigManager
 from Accuracity import AccuracyText
 from Combo import ComboText
 from Results import ResultsView
+from effects import gravity_drag
 import time
+import random
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 800
@@ -44,6 +47,7 @@ class GameView(arcade.View):
         self.buttons_list = arcade.SpriteList()
         self.godly_buttons_list = arcade.SpriteList()
         self.slider_ends = arcade.SpriteList()
+        self.gif_sprites = arcade.SpriteList()
         self.slider_bodies = []
         self.held_notes = []
         self.setup()
@@ -69,11 +73,19 @@ class GameView(arcade.View):
         self.animation_timer = 0
         self.animation_interval = 1 / 60
         self.combo_texts = []
+        self.emitters = []
+
+
 
         self.start_time = time.perf_counter()
 
     def notes_from_txt(self, song_name):
         '''Подготавливает все ноты из txt.'''
+        self.gif_sprite = arcade.load_animated_gif(f"img/{song_name}.gif")
+        self.gif_sprite.center_x = 50
+        self.gif_sprite.center_y = 750
+        self.gif_sprite.scale = 0.2
+        self.gif_sprites.append(self.gif_sprite)
         with open(f'songs/{song_name}.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()
             data = []
@@ -154,12 +166,18 @@ class GameView(arcade.View):
         for combo in self.combo_texts:
             combo.draw()
 
+        for emitter in self.emitters:
+            emitter.draw()
+
+        self.gif_sprites.draw()
+
     def on_update(self, delta_time):
         global curr_time
         self.notes_list.update()
         self.godly_notes_list.update()
         self.check_missed_notes()
         self.slider_ends.update()
+        self.gif_sprites.update()
 
         if self.combo > self.max_combo:
             self.max_combo = self.combo
@@ -235,6 +253,15 @@ class GameView(arcade.View):
                 self.slider_bodies.remove(slider_body)
 
         curr_time = time.perf_counter() - self.start_time
+
+        emitters_copy = self.emitters.copy()
+        for e in emitters_copy:
+            e.update(delta_time)
+        for e in emitters_copy:
+            if e.can_reap():
+                self.emitters.remove(e)
+
+        self.gif_sprites.update_animation()
 
         self.animation_timer += delta_time
 
@@ -389,8 +416,6 @@ class GameView(arcade.View):
 
                 return
 
-        arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
-
         if timing <= 0.04:
             accuracy = "PERFECT"
             score_mult = PERF_COEFF
@@ -412,11 +437,27 @@ class GameView(arcade.View):
             score_mult = MISS_COEFF
             self.combo = 0
         self.stats[accuracy.lower()] += 1
+
         accuracy_text = AccuracyText(accuracy, SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
         accuracy_text.color = self.accuracy_colors.get(accuracy, arcade.color.WHITE)
         self.accuracy_texts.append(accuracy_text)
         combo_text = ComboText(self.combo, 400, 370)
         self.combo_texts.append(combo_text)
+        arcade.play_sound(self.hit_sound, volume=master_volume * sfx_volume)
+
+        particle = Emitter(
+            center_xy=(closest_note.center_x, closest_note.center_y),
+            emit_controller=EmitBurst(40),
+            particle_factory=lambda e: FadeParticle(
+                filename_or_texture=arcade.make_soft_circle_texture(8, self.accuracy_colors[accuracy]),
+                change_xy=arcade.math.rand_on_circle((0.0, 0.0), 5),
+                lifetime=random.uniform(0.8, 1.4),
+                start_alpha=255, end_alpha=0,
+                scale=random.uniform(0.4, 0.7),
+                mutation_callback=gravity_drag,
+            ),
+        )
+        self.emitters.append(particle)
 
         base_score = 100
         if is_godly:
@@ -682,7 +723,7 @@ class SelectSong(QWidget):
         self.setWindowTitle('Select Song')
         self.setFixedSize(800, 700)
         self.btn_song_4nim0sity.clicked.connect(lambda: self.start_game('4nim0sity'))
-        self.btn_song_telepathy.clicked.connect(lambda: self.start_game('telepathy'))
+        self.btn_song_butcher_vanity.clicked.connect(lambda: self.start_game('butcher_vanity'))
 
     def start_game(self, song):
         global START_GAME, curr_song
