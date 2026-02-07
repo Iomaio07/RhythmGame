@@ -2,7 +2,7 @@ import sys
 from PyQt6 import uic
 from PyQt6.QtWidgets import QApplication, QWidget, QStackedWidget, QVBoxLayout, QMessageBox
 import arcade
-from arcade.particles import FadeParticle, Emitter, EmitBurst, EmitInterval, EmitMaintainCount
+from arcade.particles import FadeParticle, Emitter, EmitBurst
 from ConfigManager import ConfigManager
 from Accuracity import AccuracyText
 from Combo import ComboText
@@ -35,7 +35,7 @@ saved_settings = cfg_mng.load_settings_to_vars()
 master_volume = saved_settings['master_volume'] / 100
 music_volume = saved_settings['music_volume'] / 100
 sfx_volume = saved_settings['sfx_volume'] / 100
-fps = saved_settings['fps']
+fps = int(saved_settings['fps'])
 
 
 # --- Секция Arcade ---
@@ -59,7 +59,7 @@ class GameView(arcade.View):
         self.game_completed = False
         self.stats = {'miss': 0, 'bad': 0, 'good': 0, 'great': 0, 'perfect': 0}
         music = arcade.load_sound(f'sounds/{curr_song}.mp3')
-        arcade.play_sound(music, volume=master_volume * music_volume)
+        self.player = arcade.play_sound(music, volume=master_volume * music_volume)
         self.hit_sound = arcade.load_sound('sounds/hit_sound.mp3')
 
         self.accuracy_texts = []
@@ -74,8 +74,6 @@ class GameView(arcade.View):
         self.animation_interval = 1 / 60
         self.combo_texts = []
         self.emitters = []
-
-
 
         self.start_time = time.perf_counter()
 
@@ -98,7 +96,7 @@ class GameView(arcade.View):
                 if len(elem) == 4:
                     duration = float(elem[3])
                     if note_type == 's':
-                        sprite = 'img/SliderStart.jpg'
+                        sprite = 'img/SliderStart.png'
                         note = Note(sprite, 0.5, time, row, 'normal', duration)
                         self.notes_list.append(note)
 
@@ -109,26 +107,26 @@ class GameView(arcade.View):
                         self.slider_bodies.append(slider_body)
 
                     elif note_type == 'gs':
-                        sprite = 'img/GodlySliderStart.jpg'
+                        sprite = 'img/GodlySliderStart.png'
                         note = Note(sprite, 0.5, time, row, 'godly', duration)
                         self.godly_notes_list.append(note)
 
-                        slider_end = SliderEnd('img/GodlySliderEnd.jpg', 0.5, time + duration, row, note)
+                        slider_end = SliderEnd('img/GodlySliderEnd.png', 0.5, time + duration, row, note)
                         self.slider_ends.append(slider_end)
 
                         slider_body = SliderBody(note, slider_end)
                         self.slider_bodies.append(slider_body)
                 else:
                     if note_type == 'd':
-                        sprite = 'img/DemonNote.jpg'
+                        sprite = 'img/DemonNote.png'
                         note = Note(sprite, 0.5, time, row, 'demon')
                         self.godly_notes_list.append(note)
                     elif note_type == 'g':
-                        sprite = 'img/GodlyNote.jpg'
+                        sprite = 'img/GodlyNote.png'
                         note = Note(sprite, 0.5, time, row, 'godly')
                         self.godly_notes_list.append(note)
                     else:
-                        sprite = 'img/Note.jpg'
+                        sprite = 'img/Note.png'
                         note = Note(sprite, 0.5, time, row, 'normal')
                         self.notes_list.append(note)
 
@@ -171,7 +169,7 @@ class GameView(arcade.View):
 
         self.gif_sprites.draw()
 
-    def on_update(self, delta_time):
+    def on_update(self, delta_time=1 / fps):
         global curr_time
         self.notes_list.update()
         self.godly_notes_list.update()
@@ -196,12 +194,8 @@ class GameView(arcade.View):
         if self.show_results_delay is not None:
             self.show_results_delay -= delta_time
             if self.show_results_delay <= 0:
-                results_view = ResultsView(
-                    score=self.score,
-                    combo=self.max_combo,
-                    full_combo=self.full_combo,
-                    stats=self.stats
-                )
+                results_view = ResultsView(self.score, self.max_combo, self.full_combo, self.stats, curr_song,
+                                           self.player)
                 self.window.show_view(results_view)
                 return
 
@@ -383,7 +377,7 @@ class GameView(arcade.View):
                 self.stats['miss'] += 1
             elif note in self.godly_notes_list:
                 if note.type.lower() == 'demon':
-                    new_note = Note('img/Note.jpg', 0.5, 0,
+                    new_note = Note('img/Note.png', 0.5, 0,
                                     note.row, 'normal')
                     new_note.center_x = note.center_x
                     new_note.center_y = note.center_y
@@ -428,7 +422,7 @@ class GameView(arcade.View):
             accuracy = "GOOD"
             score_mult = GOOD_COEFF
             self.combo += 1
-        elif timing <= 0.12:
+        elif timing <= 0.125:
             accuracy = "BAD"
             score_mult = BAD_COEFF
             self.combo = 0
@@ -466,7 +460,7 @@ class GameView(arcade.View):
         self.score_text.text = self.score
 
         if closest_note.type.lower() == 'demon':
-            new_note = Note('img/Note.jpg', 0.5, 0,
+            new_note = Note('img/Note.png', 0.5, 0,
                             closest_note.row, 'normal')
             new_note.center_x = closest_note.center_x
             new_note.center_y = closest_note.center_y
@@ -559,7 +553,7 @@ class SliderBody(arcade.Sprite):
                     hold_duration = curr_time - self.hold_start_time
                     self.hold_progress = min(1.0, hold_duration / self.duration)
             else:
-                self.color = arcade.color.YELLOW
+                self.color = arcade.color.WHITE
 
     def draw(self):
         """Отрисовка тела слайдера"""
@@ -679,6 +673,7 @@ class Button(arcade.Sprite):
 class StartMenu(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle(SCREEN_TITLE)
         self.stacked_widget = QStackedWidget()
 
         self.mainmenu = MainMenu()
@@ -703,6 +698,12 @@ class StartMenu(QWidget):
     def switch_page(self, index):
         self.stacked_widget.setCurrentIndex(index)
 
+    def show_after_game(self):
+        """Показываем окно после закрытия игры"""
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
 
 class MainMenu(QWidget):
     def __init__(self):
@@ -726,10 +727,39 @@ class SelectSong(QWidget):
         self.btn_song_butcher_vanity.clicked.connect(lambda: self.start_game('butcher_vanity'))
 
     def start_game(self, song):
-        global START_GAME, curr_song
-        START_GAME = True
+        global curr_song
         curr_song = song
+
+        # self.window().hide()
         self.window().close()
+
+        launch_arcade_game()
+
+
+def launch_arcade_game():
+    global START_GAME
+
+    if not START_GAME:
+        START_GAME = True
+
+        window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, update_rate=1 / int(fps))
+        game_view = GameView()
+        window.show_view(game_view)
+
+
+        arcade.run()
+        arcade.stop_sound(game_view.player)
+
+        # Крашит, мб для себя пофикшу
+        '''START_GAME = False
+
+        windows = app.topLevelWidgets()
+        if windows:
+            main_window = windows[0]
+            main_window.close()
+            main_window.show()
+            main_window.raise_()
+            main_window.activateWindow()'''
 
 
 class Settings(QWidget):
@@ -780,7 +810,7 @@ class Settings(QWidget):
         self.SFX_Volume.setText(f"{self.tempsfxvolume}%")
 
     def change_FPS(self):
-        self.tempFPS = self.lineEdit_FPS.text()
+        self.tempFPS = int(self.lineEdit_FPS.text())
 
     def save_changes(self):
         global master_volume, music_volume, sfx_volume, fps
@@ -791,8 +821,10 @@ class Settings(QWidget):
         master_volume = self.master_volume / 100
         music_volume = self.music_volume / 100
         sfx_volume = self.sfx_volume / 100
-        fps = self.FPS
-
+        if fps <= 0 or not fps.isdigit():
+            fps = 60
+        else:
+            fps = self.FPS
         config_to_save = {
             'master_volume': str(self.master_volume),
             'music_volume': str(self.music_volume),
@@ -830,18 +862,11 @@ class Settings(QWidget):
 
 
 def main():
+    global app
     app = QApplication(sys.argv)
     menu = StartMenu()
     menu.show()
     app.exec()
-
-    del app
-
-    if START_GAME:
-        window = arcade.Window(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE, update_rate=1 / int(fps))
-        game_view = GameView()
-        window.show_view(game_view)
-        arcade.run()
 
 
 if __name__ == '__main__':

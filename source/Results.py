@@ -7,12 +7,14 @@ SCREEN_HEIGHT = 800
 
 
 class ResultsView(arcade.View):
-    def __init__(self, score, combo, full_combo, stats):
+    def __init__(self, score, combo, full_combo, stats, song, player):
         super().__init__()
         self.score = score
         self.combo = combo
         self.full_combo = full_combo
         self.stats = stats
+        self.song = song
+        self.player = player
 
         self.manager = arcade.gui.UIManager()
         self.manager.enable()
@@ -80,7 +82,8 @@ class ResultsView(arcade.View):
 
         @exit_button.event("on_click")
         def on_click_exit_button(event):
-            arcade.exit()
+            arcade.stop_sound(self.player)
+            arcade.close_window()
 
         h_box = arcade.gui.UIBoxLayout(vertical=False)
         h_box.add(exit_button)
@@ -126,6 +129,7 @@ class ResultsView(arcade.View):
             counter += 1
 
         with open(f'results/results_{counter}.txt', 'w', encoding='utf-8') as f:
+            f.write(f'{self.song.upper()}:\n')
             for key, value in results_to_save.items():
                 f.write(f"{key}={value}\n")
 
@@ -148,5 +152,6 @@ class ResultsView(arcade.View):
         self.manager.draw()
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.ESCAPE or key == arcade.key.ENTER or key == arcade.key.SPACE:
+        if key == arcade.key.ESCAPE or key == arcade.key.SPACE:
+            arcade.stop_sound(self.player)
             arcade.close_window()
